@@ -1,0 +1,7 @@
+{
+  "name": "Nexus AI - Your Multi-Persona Live Assistant",
+  "description": "An advanced voice-first personal assistant powered by Gemini 2.5 Live API. Choose between Homework Helper, Web Dev Expert, Task Manager, or Ethical Hacker personas for real-time conversational assistance.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
