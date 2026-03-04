@@ -17,46 +17,10 @@ Nexus AI is a cutting-edge, real-time voice assistant powered by the Gemini 2.5 
 - **Modern Dark UI**: A sleek, responsive interface designed for both desktop and mobile use.
 - **Privacy Focused**: Direct connection to Gemini API with secure session management.
 
-## 🛠️ Getting Started
-
-### Prerequisites
-
-- Node.js (v18 or higher)
-- A Gemini API Key (get one at [ai.google.dev](https://ai.google.dev))
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/your-username/nexus-ai-assistant.git
-   cd nexus-ai-assistant
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Set up your environment variables:
-   Create a `.env` file in the root directory and add your API key:
-   ```env
-   GEMINI_API_KEY=your_api_key_here
-   ```
-
-4. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-5. Open your browser and navigate to `http://localhost:3000`.
 
 ## 📜 Usage
 
-1. Select a persona from the sidebar that fits your needs.
-2. Click **CONNECT NEXUS** to establish a neural link.
-3. Speak clearly to the assistant. If you need a document, ask **Task Boy** to generate a list or form.
-4. Use the **Document Vault** on the right to copy or print your generated content.
-5. Click **TERMINATE LINK** when you are finished.
+1. Select a persona from the sidebar that fits your needs 
 
 ## ⚖️ License & Copyright
 
