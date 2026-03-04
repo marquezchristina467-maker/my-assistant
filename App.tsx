@@ -16,6 +16,8 @@ const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [latestText, setLatestText] = useState<string>('');
+  const [documents, setDocuments] = useState<{ id: string, title: string, content: string, timestamp: number }[]>([]);
+  const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Refs for session management
@@ -99,7 +101,17 @@ const App: React.FC = () => {
     }
 
     if (message.serverContent?.turnComplete) {
-      // We keep the text for the user to copy/print
+      if (latestText.trim()) {
+        const newDoc = {
+          id: Date.now().toString(),
+          title: `Generated ${new Date().toLocaleTimeString()}`,
+          content: latestText,
+          timestamp: Date.now()
+        };
+        setDocuments(prev => [newDoc, ...prev]);
+        setActiveDocId(newDoc.id);
+        setLatestText('');
+      }
     }
 
     // Interruption Handling
@@ -263,6 +275,7 @@ const App: React.FC = () => {
 
         <div className="flex-1 flex flex-col p-4 md:p-6 min-h-0 overflow-hidden">
           <div className="flex-1 flex flex-col lg:flex-row gap-6 min-h-0 overflow-hidden">
+            {/* Assistant View */}
             <div className="flex-1 flex flex-col items-center justify-center bg-slate-900/40 rounded-3xl border border-white/5 p-4 md:p-8 overflow-hidden relative">
               <div className="w-full max-w-sm flex flex-col items-center">
                 <AssistantFace 
@@ -281,56 +294,95 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Structured Output Area (for lists/forms) */}
-            <div className={`flex-1 flex flex-col bg-slate-900/80 rounded-3xl border-2 border-blue-500/30 p-4 md:p-6 min-h-0 overflow-hidden transition-all duration-500 ${latestText ? 'opacity-100 translate-x-0' : 'opacity-0 translate-x-4 pointer-events-none'}`}>
+            {/* Document Vault & Generator */}
+            <div className="flex-1 flex flex-col bg-slate-900/80 rounded-3xl border-2 border-blue-500/20 p-4 md:p-6 min-h-0 overflow-hidden">
               <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3 shrink-0">
                 <div className="flex flex-col">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-blue-400">Document Output</h3>
-                  <p className="text-[10px] text-slate-400">Copy or print your generated content</p>
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-blue-400">Document Vault</h3>
+                  <p className="text-[10px] text-slate-400">Generated forms, lists, and info</p>
                 </div>
                 <div className="flex gap-2">
+                  {activeDocId && (
+                    <button 
+                      onClick={() => {
+                        const doc = documents.find(d => d.id === activeDocId);
+                        if (doc) {
+                          navigator.clipboard.writeText(doc.content);
+                          alert('Document copied!');
+                        }
+                      }} 
+                      className="flex items-center gap-2 text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-bold uppercase transition-all shadow-lg active:scale-95"
+                    >
+                      Copy
+                    </button>
+                  )}
                   <button 
                     onClick={() => {
-                      if (!latestText) return;
-                      navigator.clipboard.writeText(latestText);
-                      alert('Text copied to clipboard!');
+                      setDocuments([]);
+                      setActiveDocId(null);
+                      setLatestText('');
                     }} 
-                    className="flex items-center gap-2 text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-bold uppercase transition-all shadow-lg active:scale-95"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"></path></svg>
-                    Copy Text
-                  </button>
-                  <button 
-                    onClick={() => setLatestText('')} 
                     className="text-[10px] bg-white/5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 px-3 py-1.5 rounded-lg font-bold uppercase transition-all border border-white/5"
                   >
-                    Clear
+                    Clear All
                   </button>
                 </div>
               </div>
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 bg-black/40 rounded-2xl p-5 border border-white/5 shadow-inner">
-                <pre className="text-sm font-mono whitespace-pre-wrap leading-relaxed text-slate-100 selection:bg-blue-500/50">
-                  {latestText || "Waiting for Task Boy to speak..."}
-                </pre>
-              </div>
-              <div className="mt-4 pt-4 border-t border-white/10 flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-2 w-2 relative">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span>
-                  </span>
-                  <p className="text-[10px] text-slate-400 font-medium">Ready for printing</p>
+
+              <div className="flex-1 flex flex-col min-h-0 gap-4">
+                {/* Document List (Horizontal Tabs) */}
+                {documents.length > 0 && (
+                  <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar shrink-0">
+                    {documents.map(doc => (
+                      <button
+                        key={doc.id}
+                        onClick={() => setActiveDocId(doc.id)}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap transition-all border ${
+                          activeDocId === doc.id 
+                            ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' 
+                            : 'bg-white/5 border-white/5 text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        {doc.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Active Document Content */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/40 rounded-2xl p-5 border border-white/5 shadow-inner relative">
+                  {latestText && (
+                    <div className="absolute top-4 right-4 flex items-center gap-2">
+                      <span className="flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                      </span>
+                      <span className="text-[9px] text-amber-500 font-bold uppercase">Generating...</span>
+                    </div>
+                  )}
+                  
+                  <pre className="text-sm font-mono whitespace-pre-wrap leading-relaxed text-slate-100 selection:bg-blue-500/50">
+                    {latestText || (activeDocId ? documents.find(d => d.id === activeDocId)?.content : "Ask the assistant to generate a form, list, or document. It will appear here automatically.")}
+                  </pre>
                 </div>
-                <button 
-                  onClick={() => {
-                    if (!latestText) return;
-                    window.print();
-                  }} 
-                  className="flex items-center gap-2 text-[10px] bg-white text-slate-900 px-5 py-2.5 rounded-xl font-bold uppercase hover:bg-slate-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-95"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                  Print Document
-                </button>
+
+                {activeDocId && (
+                  <div className="pt-4 border-t border-white/10 flex justify-between items-center shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-2 w-2 relative">
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                      <p className="text-[10px] text-slate-400 font-medium">Document Ready</p>
+                    </div>
+                    <button 
+                      onClick={() => window.print()} 
+                      className="flex items-center gap-2 text-[10px] bg-white text-slate-900 px-5 py-2.5 rounded-xl font-bold uppercase hover:bg-slate-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-95"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                      Print Active
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -366,6 +418,10 @@ const App: React.FC = () => {
                 </>
               )}
             </button>
+          </div>
+          <div className="mt-6 text-center text-[9px] text-slate-600 uppercase tracking-widest">
+            <p>© {new Date().getFullYear()} Nexus AI. All rights reserved.</p>
+            <p className="mt-1 normal-case italic opacity-50">anyone copies or used it with my written knowledge will be forces to cease a otherwise fined</p>
           </div>
         </div>
       </main>
