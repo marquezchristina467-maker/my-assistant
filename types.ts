@@ -1,5 +1,5 @@
 
-export type PersonaType = 'assistant' | 'academic' | 'coder' | 'hacker' | 'manager' | 'travel' | 'nerd' | 'streetwise' | 'finance' | 'boy';
+export type PersonaType = 'assistant' | 'academic' | 'coder' | 'hacker' | 'manager' | 'travel' | 'nerd' | 'streetwise' | 'finance' | 'boy' | 'legal';
 
 export interface PersonaConfig {
   id: PersonaType;
