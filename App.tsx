@@ -18,6 +18,7 @@ const App: React.FC = () => {
   const [latestText, setLatestText] = useState<string>('');
   const [documents, setDocuments] = useState<{ id: string, title: string, content: string, timestamp: number }[]>([]);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
+  const [websiteConfig, setWebsiteConfig] = useState<WebsiteConfig>(defaultWebsiteConfig);
   const [error, setError] = useState<string | null>(null);
   const [memory, setMemory] = useState<{ role: 'user' | 'model', timestamp: number, text: string }[]>(() => {
     try {
@@ -150,22 +151,41 @@ const App: React.FC = () => {
 
     if (message.serverContent?.turnComplete) {
       if (modelTurnBufferRef.current.trim()) {
-        const text = modelTurnBufferRef.current.trim();
-        setMemory(prev => [...prev, { role: 'model', timestamp: Date.now(), text }]);
+        let text = modelTurnBufferRef.current.trim();
+        
+        // Extract Website Config
+        const webConfigRegex = /\[\[WEB_CONFIG\]\](.*?)\[\[\/WEB_CONFIG\]\]/s;
+        const match = text.match(webConfigRegex);
+        if (match) {
+          try {
+            const config = JSON.parse(match[1]);
+            setWebsiteConfig(prev => ({ ...prev, ...config }));
+          } catch (e) {
+            console.error("Failed to parse web config", e);
+          }
+          text = text.replace(webConfigRegex, '');
+        }
+
+        if (text.trim()) {
+          setMemory(prev => [...prev, { role: 'model', timestamp: Date.now(), text }]);
+        }
         modelTurnBufferRef.current = '';
       }
 
-      if (latestText.trim()) {
-        const newDoc = {
-          id: Date.now().toString(),
-          title: `Generated ${new Date().toLocaleTimeString()}`,
-          content: latestText,
-          timestamp: Date.now()
-        };
-        setDocuments(prev => [newDoc, ...prev]);
-        setActiveDocId(newDoc.id);
-        setLatestText('');
-      }
+      setLatestText(prevText => {
+        let strippedText = prevText.replace(/\[\[WEB_CONFIG\]\].*?\[\[\/WEB_CONFIG\]\]/gs, '');
+        if (strippedText.trim()) {
+          const newDoc = {
+            id: Date.now().toString(),
+            title: `Generated ${new Date().toLocaleTimeString()}`,
+            content: strippedText,
+            timestamp: Date.now()
+          };
+          setDocuments(prev => [newDoc, ...prev]);
+          setActiveDocId(newDoc.id);
+        }
+        return '';
+      });
     }
 
     // Interruption Handling
@@ -375,119 +395,132 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* Document Vault & Generator */}
-            <div className="flex-1 flex flex-col bg-slate-900/80 rounded-3xl border-2 border-blue-500/20 p-4 md:p-6 min-h-0 overflow-hidden">
-              <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3 shrink-0">
-                <div className="flex flex-col">
-                  <h3 className="text-xs font-bold uppercase tracking-widest text-blue-400">Document Vault</h3>
-                  <p className="text-[10px] text-slate-400">Generated forms, lists, and info</p>
+            {selectedPersona.id === 'coder' ? (
+              <div className="flex-1 flex flex-col bg-slate-900/80 rounded-3xl border-2 border-emerald-500/20 min-h-0 overflow-hidden shadow-2xl relative z-10">
+                <div className="flex items-center justify-between mb-0 border-b border-emerald-500/10 p-3 shrink-0 bg-slate-800">
+                  <div className="flex flex-col">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-emerald-400">Web Canvas</h3>
+                    <p className="text-[9px] text-slate-400">Live Website Builder</p>
+                  </div>
                 </div>
-                <div className="flex gap-2">
-                  {activeDocId && (
-                    <button 
-                      onClick={() => {
-                        const doc = documents.find(d => d.id === activeDocId);
-                        if (doc) {
-                          navigator.clipboard.writeText(doc.content);
-                          alert('Document copied!');
-                        }
-                      }} 
-                      className="flex items-center gap-2 text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-bold uppercase transition-all shadow-lg active:scale-95"
-                    >
-                      Copy
-                    </button>
-                  )}
-                  <button 
-                    onClick={() => {
-                      setDocuments([]);
-                      setActiveDocId(null);
-                      setLatestText('');
-                    }} 
-                    className="text-[10px] bg-white/5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 px-3 py-1.5 rounded-lg font-bold uppercase transition-all border border-white/5"
-                  >
-                    Clear All
-                  </button>
+                <div className="flex-1 overflow-hidden">
+                  <WebsiteBuilder config={websiteConfig} onChange={setWebsiteConfig} />
                 </div>
               </div>
-
-              <div className="flex-1 flex flex-col min-h-0 gap-4">
-                {/* Document List (Horizontal Tabs) */}
-                {documents.length > 0 && (
-                  <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar shrink-0">
-                    {documents.map(doc => (
-                      <button
-                        key={doc.id}
-                        onClick={() => setActiveDocId(doc.id)}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap transition-all border ${
-                          activeDocId === doc.id 
-                            ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' 
-                            : 'bg-white/5 border-white/5 text-slate-500 hover:text-slate-300'
-                        }`}
-                      >
-                        {doc.title}
-                      </button>
-                    ))}
+            ) : (
+              <div className="flex-1 flex flex-col bg-slate-900/80 rounded-3xl border-2 border-blue-500/20 p-4 md:p-6 min-h-0 overflow-hidden relative z-10 shadow-2xl">
+                <div className="flex items-center justify-between mb-4 border-b border-white/10 pb-3 shrink-0">
+                  <div className="flex flex-col">
+                    <h3 className="text-xs font-bold uppercase tracking-widest text-blue-400">Document Vault</h3>
+                    <p className="text-[10px] text-slate-400">Generated forms, lists, and info</p>
                   </div>
-                )}
-
-                {/* Active Document Content */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/40 rounded-2xl p-5 border border-white/5 shadow-inner relative">
-                  {latestText && (
-                    <div className="absolute top-4 right-4 flex items-center gap-2">
-                      <span className="flex h-2 w-2 relative">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
-                      </span>
-                      <span className="text-[9px] text-amber-500 font-bold uppercase">Generating...</span>
-                    </div>
-                  )}
-                  
-                  <pre className="text-sm font-mono whitespace-pre-wrap leading-relaxed text-slate-100 selection:bg-blue-500/50">
-                    {latestText || (activeDocId ? documents.find(d => d.id === activeDocId)?.content : "Ask the assistant to generate a form, list, or document. It will appear here automatically.")}
-                  </pre>
-                </div>
-
-                {activeDocId && (
-                  <div className="pt-4 border-t border-white/10 flex justify-between items-center shrink-0">
-                    <div className="flex items-center gap-2">
-                      <span className="flex h-2 w-2 relative">
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </span>
-                      <p className="text-[10px] text-slate-400 font-medium">Document Ready</p>
-                    </div>
-                    <div className="flex gap-2">
+                  <div className="flex gap-2">
+                    {activeDocId && (
                       <button 
                         onClick={() => {
                           const doc = documents.find(d => d.id === activeDocId);
                           if (doc) {
-                            const blob = new Blob([doc.content], { type: 'text/markdown' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            a.download = `Nexus_Document_${doc.title.replace(/[^a-z0-9]/gi, '_')}.md`;
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
+                            navigator.clipboard.writeText(doc.content);
+                            alert('Document copied!');
                           }
-                        }}
-                        className="flex items-center gap-2 text-[10px] bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold uppercase hover:bg-blue-500 transition-all shadow-lg active:scale-95"
+                        }} 
+                        className="flex items-center gap-2 text-[10px] bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg font-bold uppercase transition-all shadow-lg active:scale-95"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
-                        Download
+                        Copy
                       </button>
-                      <button 
-                        onClick={() => window.print()} 
-                        className="flex items-center gap-2 text-[10px] bg-white text-slate-900 px-5 py-2.5 rounded-xl font-bold uppercase hover:bg-slate-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-95"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                        Print Active
-                      </button>
-                    </div>
+                    )}
+                    <button 
+                      onClick={() => {
+                        setDocuments([]);
+                        setActiveDocId(null);
+                        setLatestText('');
+                      }} 
+                      className="text-[10px] bg-white/5 hover:bg-red-500/20 text-slate-400 hover:text-red-400 px-3 py-1.5 rounded-lg font-bold uppercase transition-all border border-white/5"
+                    >
+                      Clear All
+                    </button>
                   </div>
-                )}
+                </div>
+
+                <div className="flex-1 flex flex-col min-h-0 gap-4">
+                  {/* Document List (Horizontal Tabs) */}
+                  {documents.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar shrink-0">
+                      {documents.map(doc => (
+                        <button
+                          key={doc.id}
+                          onClick={() => setActiveDocId(doc.id)}
+                          className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase whitespace-nowrap transition-all border ${
+                            activeDocId === doc.id 
+                              ? 'bg-blue-500/20 border-blue-500/50 text-blue-400' 
+                              : 'bg-white/5 border-white/5 text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          {doc.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Active Document Content */}
+                  <div className="flex-1 overflow-y-auto custom-scrollbar bg-black/40 rounded-2xl p-5 border border-white/5 shadow-inner relative">
+                    {latestText && (
+                      <div className="absolute top-4 right-4 flex items-center gap-2">
+                        <span className="flex h-2 w-2 relative">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                        </span>
+                        <span className="text-[9px] text-amber-500 font-bold uppercase">Generating...</span>
+                      </div>
+                    )}
+                    
+                    <pre className="text-sm font-mono whitespace-pre-wrap leading-relaxed text-slate-100 selection:bg-blue-500/50">
+                      {latestText || (activeDocId ? documents.find(d => d.id === activeDocId)?.content : "Ask the assistant to generate a form, list, or document. It will appear here automatically.")}
+                    </pre>
+                  </div>
+
+                  {activeDocId && (
+                    <div className="pt-4 border-t border-white/10 flex justify-between items-center shrink-0">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2 relative">
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                        </span>
+                        <p className="text-[10px] text-slate-400 font-medium">Document Ready</p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            const doc = documents.find(d => d.id === activeDocId);
+                            if (doc) {
+                              const blob = new Blob([doc.content], { type: 'text/markdown' });
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `Nexus_Document_${doc.title.replace(/[^a-z0-9]/gi, '_')}.md`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              URL.revokeObjectURL(url);
+                            }
+                          }}
+                          className="flex items-center gap-2 text-[10px] bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold uppercase hover:bg-blue-500 transition-all shadow-lg active:scale-95"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                          Download
+                        </button>
+                        <button 
+                          onClick={() => window.print()} 
+                          className="flex items-center gap-2 text-[10px] bg-white text-slate-900 px-5 py-2.5 rounded-xl font-bold uppercase hover:bg-slate-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-95"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                          Print Active
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
