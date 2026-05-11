@@ -19,6 +19,15 @@ const App: React.FC = () => {
   const [documents, setDocuments] = useState<{ id: string, title: string, content: string, timestamp: number }[]>([]);
   const [activeDocId, setActiveDocId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [memory, setMemory] = useState<{ role: 'user' | 'model', timestamp: number, text: string }[]>(() => {
+    try {
+      const stored = localStorage.getItem('nexus_memory');
+      return stored ? JSON.parse(stored) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+  const [keepAwake, setKeepAwake] = useState(false);
 
   // Refs for session management
   const sessionRef = useRef<any>(null);
@@ -27,6 +36,43 @@ const App: React.FC = () => {
   const micStreamRef = useRef<MediaStream | null>(null);
   const scriptProcessorRef = useRef<ScriptProcessorNode | null>(null);
   const inputSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const modelTurnBufferRef = useRef<string>('');
+  const wakeLockRef = useRef<any>(null);
+
+  useEffect(() => {
+    const requestWakeLock = async () => {
+      try {
+        if (keepAwake && 'wakeLock' in navigator) {
+          wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        } else if (!keepAwake && wakeLockRef.current) {
+          await wakeLockRef.current.release();
+          wakeLockRef.current = null;
+        }
+      } catch (err) {
+        console.error('WakeLock error:', err);
+      }
+    };
+    
+    requestWakeLock();
+    
+    const handleVisibilityChange = () => {
+      if (keepAwake && document.visibilityState === 'visible') {
+        requestWakeLock();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release().catch(() => {});
+        wakeLockRef.current = null;
+      }
+    };
+  }, [keepAwake]);
+
+  useEffect(() => {
+    localStorage.setItem('nexus_memory', JSON.stringify(memory.slice(-50)));
+  }, [memory]);
 
   const stopSession = useCallback(() => {
     // 1. Close session
@@ -95,12 +141,20 @@ const App: React.FC = () => {
       setLatestText(prev => prev + textPart + "\n");
     }
 
-    // Capture model's speech as text for copying/printing
+    // Capture model's speech as text for copying/printing and memory
     if (message.serverContent?.outputTranscription) {
-      setLatestText(prev => prev + message.serverContent.outputTranscription.text);
+      const t = message.serverContent.outputTranscription.text;
+      setLatestText(prev => prev + t);
+      modelTurnBufferRef.current += t;
     }
 
     if (message.serverContent?.turnComplete) {
+      if (modelTurnBufferRef.current.trim()) {
+        const text = modelTurnBufferRef.current.trim();
+        setMemory(prev => [...prev, { role: 'model', timestamp: Date.now(), text }]);
+        modelTurnBufferRef.current = '';
+      }
+
       if (latestText.trim()) {
         const newDoc = {
           id: Date.now().toString(),
@@ -144,11 +198,15 @@ const App: React.FC = () => {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       micStreamRef.current = stream;
 
+      const memoryContext = memory.length > 0 
+        ? `\n\n--- PAST CONVERSATION MEMORY ---\nYou have persistent memory of past interactions with Christina. Here is a log of recent interactions:\n${memory.slice(-20).map(m => `[${new Date(m.timestamp).toLocaleTimeString()}] ${m.role === 'user' ? 'Christina' : 'You'}: ${m.text}`).join('\n')}\n\nUse this context seamlessly, as if you never forgot anything.` 
+        : '';
+
       const sessionPromise = ai.live.connect({
         model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         config: {
           responseModalities: [Modality.AUDIO],
-          systemInstruction: selectedPersona.systemInstruction,
+          systemInstruction: selectedPersona.systemInstruction + memoryContext,
           speechConfig: {
             voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Zephyr' } }
           },
@@ -249,11 +307,33 @@ const App: React.FC = () => {
           ))}
         </div>
 
-        <div className="mt-auto pt-6 border-t border-white/5">
+        <div className="mt-auto pt-6 border-t border-white/5 space-y-3">
           <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono uppercase tracking-widest">
             <span className={`w-2 h-2 rounded-full ${isSessionActive ? 'bg-emerald-500 animate-pulse' : isConnecting ? 'bg-amber-500 animate-bounce' : 'bg-slate-600'}`}></span>
             {isConnecting ? 'Connecting...' : isSessionActive ? 'Session Active' : 'Ready'}
           </div>
+          <button
+            onClick={() => {
+              if (window.confirm('Clear all persistent memory and reset the assistant?')) {
+                setMemory([]);
+                localStorage.removeItem('nexus_memory');
+              }
+            }}
+            className="w-full text-[10px] uppercase font-bold tracking-wider text-slate-400 hover:text-red-400 bg-white/5 hover:bg-red-500/10 p-2 rounded-lg border border-transparent hover:border-red-500/20 transition-all"
+          >
+            Clear Memory
+          </button>
+          
+          <label className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/10 mt-2 cursor-pointer hover:bg-white/10 transition-all group">
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-300">Keep App Awake</span>
+            <input
+              type="checkbox"
+              className="sr-only peer"
+              checked={keepAwake}
+              onChange={(e) => setKeepAwake(e.target.checked)}
+            />
+            <div className="w-7 h-4 bg-slate-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-emerald-500 relative shrink-0"></div>
+          </label>
         </div>
       </aside>
 
@@ -282,6 +362,7 @@ const App: React.FC = () => {
                   isActive={isSessionActive} 
                   isSpeaking={isSpeaking} 
                   color={selectedPersona.color} 
+                  imageUrl={selectedPersona.imageUrl}
                 />
                 <div className="text-center space-y-2 relative z-10 mt-4">
                   <p className={`text-lg md:text-xl font-medium transition-opacity ${isSessionActive || isConnecting ? 'opacity-100' : 'opacity-40'}`}>
@@ -374,13 +455,35 @@ const App: React.FC = () => {
                       </span>
                       <p className="text-[10px] text-slate-400 font-medium">Document Ready</p>
                     </div>
-                    <button 
-                      onClick={() => window.print()} 
-                      className="flex items-center gap-2 text-[10px] bg-white text-slate-900 px-5 py-2.5 rounded-xl font-bold uppercase hover:bg-slate-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-95"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
-                      Print Active
-                    </button>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => {
+                          const doc = documents.find(d => d.id === activeDocId);
+                          if (doc) {
+                            const blob = new Blob([doc.content], { type: 'text/markdown' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `Nexus_Document_${doc.title.replace(/[^a-z0-9]/gi, '_')}.md`;
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                          }
+                        }}
+                        className="flex items-center gap-2 text-[10px] bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold uppercase hover:bg-blue-500 transition-all shadow-lg active:scale-95"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Download
+                      </button>
+                      <button 
+                        onClick={() => window.print()} 
+                        className="flex items-center gap-2 text-[10px] bg-white text-slate-900 px-5 py-2.5 rounded-xl font-bold uppercase hover:bg-slate-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.2)] active:scale-95"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        Print Active
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -8,6 +8,7 @@ export interface PersonaConfig {
   systemInstruction: string;
   color: string;
   icon: string;
+  imageUrl?: string;
 }
 
 export interface MessagePart {

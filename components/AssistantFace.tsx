@@ -5,6 +5,7 @@ interface AssistantFaceProps {
   isActive: boolean;
   isSpeaking: boolean;
   color: string;
+  imageUrl?: string;
 }
 
 const AssistantFace: React.FC<AssistantFaceProps> = ({ isActive, isSpeaking, color }) => {
@@ -32,6 +33,7 @@ const AssistantFace: React.FC<AssistantFaceProps> = ({ isActive, isSpeaking, col
 
       {/* The Face Container */}
       <div className={`relative w-full h-full flex items-center justify-center transition-transform duration-700 ${isActive ? 'scale-100' : 'scale-90 grayscale-[0.5] opacity-60'}`}>
+        
         <svg viewBox="0 0 200 240" className="w-full h-full drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
           <defs>
             <linearGradient id="faceGradient" x1="0%" y1="0%" x2="100%" y2="100%">
