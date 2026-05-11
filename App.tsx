@@ -419,9 +419,14 @@ const App: React.FC = () => {
               )}
             </button>
           </div>
-          <div className="mt-6 text-center text-[9px] text-slate-600 uppercase tracking-widest">
-            <p>© {new Date().getFullYear()} Nexus AI. All rights reserved.</p>
-            <p className="mt-1 normal-case italic opacity-50">anyone copies or used it with my written knowledge will be forces to cease a otherwise fined</p>
+          <div className="mt-6 text-center text-[9px] text-slate-600 uppercase tracking-widest space-y-2">
+            <p className="font-bold text-slate-400">© {new Date().getFullYear()} Nexus AI. All rights reserved.</p>
+            <div className="bg-red-500/5 p-3 rounded-lg border border-red-500/10">
+              <p className="text-red-400 font-bold mb-1">COPYRIGHT WARNING</p>
+              <p className="normal-case italic text-[10px] text-slate-500 leading-relaxed max-w-md mx-auto">
+                Anyone who copies or uses this platform without prior written knowledge or permission will be forced to cease immediately or otherwise be fined under international intellectual property law.
+              </p>
+            </div>
           </div>
         </div>
       </main>

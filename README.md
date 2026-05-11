@@ -62,7 +62,8 @@ Nexus AI is a cutting-edge, real-time voice assistant powered by the Gemini 2.5 
 
 © 2026 Nexus AI. All rights reserved.
 
-*anyone copies or used it with my written knowledge will be forces to cease a otherwise fined*
+### ⚠️ COPYRIGHT WARNING
+Anyone who copies or uses this platform without prior written knowledge or permission will be forced to cease immediately or otherwise be fined under international intellectual property law.
 
 ---
 Built with ❤️ using React, Tailwind CSS, and Google Gemini.
