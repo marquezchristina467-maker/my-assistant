@@ -5,6 +5,7 @@ import { PersonaConfig } from './types';
 import { PERSONAS } from './constants';
 import { decodeBase64, decodeAudioData, createAudioBlob } from './services/audioUtils';
 import AssistantFace from './components/AssistantFace';
+import { WebsiteBuilder, WebsiteConfig, defaultWebsiteConfig } from './components/WebsiteBuilder';
 
 // Create contexts lazily or ensure they are resumed on gesture
 let inputCtx: AudioContext | null = null;
